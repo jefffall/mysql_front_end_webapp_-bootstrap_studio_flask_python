@@ -1,0 +1,247 @@
+# (this did not work) pip install mysqlclient
+# NEEDED -- >pip install pymysql
+# NEEDED --> pip install cryptography
+# PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/puppetlabs/pdk/bin:/usr/local/go/bin:/usr/local/mysql/bin"
+
+import pymysql
+
+def build_column_items_for_table_create():
+	
+	#h1 = ["filer","path","uid"]
+	h1 = []
+
+	for n in range(5,370,5):
+		m = str(n)
+		if len(m) == 1:
+			days = "00" + m
+		
+		elif len(m) == 2:
+			days = "0" + m
+		
+		else:
+			days = m
+		
+		day_files = days + "_day_files"
+		dev_data  = days + "_day_data"
+	
+		h1.append(day_files)
+		h1.append(dev_data)
+	
+	h1.append("over_1_year_files")
+	h1.append("over_1_year_data")
+#	h1.append("access_or_modify")
+	return (h1)
+
+
+def build_column_items_for_table_write():
+	
+	h1 = ["filer","path","uid"]
+	
+
+	for n in range(5,370,5):
+		m = str(n)
+		if len(m) == 1:
+			days = "00" + m
+		
+		elif len(m) == 2:
+			days = "0" + m
+		
+		else:
+			days = m
+		
+		day_files = days + "_day_files"
+		dev_data  = days + "_day_data"
+	
+		h1.append(day_files)
+		h1.append(dev_data)
+	
+	h1.append("over_1_year_files")
+	h1.append("over_1_year_data")
+	h1.append("access_or_modify")
+	return (h1)
+
+def build_only_days_data_columns_string():
+
+	h1 = []
+	
+
+	for n in range(5,185,5):
+		m = str(n)
+		if len(m) == 1:
+			days = "00" + m
+		
+		elif len(m) == 2:
+			days = "0" + m
+		
+		else:
+			days = m
+		
+		day_files = days + "_day_files"
+		dev_data  = days + "_day_data"
+	
+		#h1.append(day_files)
+		h1.append(dev_data)
+		heading_string = ""
+	for column in h1:
+		heading_string = heading_string + column + "+"
+	# remove last comma
+	headings_string = heading_string[:-1]
+	
+	return (headings_string)
+	
+
+
+
+def build_volume_usage_table(with_these_columns):
+	mysql_table_description = "create table volume_usage ( row_id BIGINT AUTO_INCREMENT PRIMARY KEY,\
+	    filer VARCHAR(80) DEFAULT '',\
+	    path VARCHAR(80) DEFAULT '',\
+	    uid VARCHAR(80) DEFAULT '',"
+	for column_id in with_these_columns:
+		mysql_table_description = mysql_table_description + column_id + " BIGINT DEFAULT 0,"
+	mysql_table_description = mysql_table_description + "access_or_modify" + " VARCHAR(80) DEFAULT ''"
+	    
+	mysql_table_description = mysql_table_description +")"
+	
+	#print mysql_table_description
+	#exit (0)
+	    
+	    
+	return (mysql_table_description)
+
+
+
+
+
+def initialize_table(with_these_columns):
+
+	print "Using pymysql..."
+
+	con = pymysql.connect( host="localhost", user="user1", passwd="user1", db="historical" )
+	with con:
+    
+	    cur = con.cursor()
+	    cur.execute("SELECT VERSION()")
+	    version = cur.fetchone()
+	    print("Database version: {}".format(version[0]))
+	    
+	    cur.execute("DROP TABLE volume_usage")
+	    
+	   
+	    table_build_command = build_volume_usage_table(with_these_columns)
+	    
+	    cur.execute(table_build_command)
+	    
+	    cur.execute("SHOW TABLES")
+	    tables = cur.fetchone()
+	    print tables
+	    #print("Database tables: {}".format(tables[0]))
+	    
+	    #cur.execute("DROP TABLE volume_usage")
+	   
+	con.close()
+	
+	
+def make_insert_into_table_string():
+	columns_list = build_column_items_for_table_write()
+	table_insert_command = "INSERT INTO volume_usage("
+	for column_name in columns_list:
+		table_insert_command = table_insert_command + column_name + ","
+	table_insert_command = table_insert_command[:-1] # remove the last ,
+	table_insert_command = table_insert_command + ") "
+		
+	table_insert_command = table_insert_command + "VALUES ("
+	
+	return(table_insert_command)
+	
+	
+	
+def write_csv_to_table():
+
+	
+
+	mycsv = open("/Users/jfall/Downloads/scan_04132020_file_modify.csv","r")
+	
+
+	con = pymysql.connect( host="localhost", user="user1", passwd="user1", db="historical" )
+	with con:
+		cur = con.cursor()
+		counter = 0
+		print "with con"
+		for item in mycsv:
+			counter = counter + 1
+			#if counter > 5:
+				#break
+			#print counter
+			table_insert_command = make_insert_into_table_string()
+			
+			row_list = item.split(",")
+			# get white space out of items in list. csv read imports a lot of whitespace
+			row_list = [i.strip() for i in row_list]
+			if counter > 1:
+				for column in row_list:
+					table_insert_command = table_insert_command + "'"+ column + "'" + ","
+				table_insert_command = table_insert_command[:-1] # remove trailing ,
+				table_insert_command = table_insert_command + ")"
+			
+				print table_insert_command + "\n"
+				cur.execute(table_insert_command)
+	con.close()
+	mycsv.close()
+	
+	
+	
+def sql_query(query):
+	con = pymysql.connect( host="localhost", user="user1", passwd="user1", db="historical" )
+	with con:
+		cur = con.cursor()
+		cur.execute(query)
+		rows = cur.fetchall()
+		for row in rows:
+			row_data = ""
+			print "____________________________"
+			#print ("{0}\t {1}\t {2}".format(row[0], row[1], row[2]))
+			for item in row:
+				row_data = row_data + str(item) + "\t"
+			print row_data
+
+	con.close()
+		
+	
+	
+#-------------------------------------------------------------------------------------------
+
+# This section builds the database tables. For queries - do not run this section again
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++	
+#column_items = build_column_items_for_table_create()
+
+#initialize_table(column_items)
+
+#write_csv_to_table()
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+#sql_query("SELECT filer,path, 365_day_data  from volume_usage where 365_day_data > 0 and 365_day_data < 10000000")
+
+#sql_query("show columns from volume_usage")
+
+columns = build_only_days_data_columns_string()
+
+#sql_query("SELECT filer, SUM("+columns+") AS TOTAL FROM volume_usage")
+query_string = "SELECT filer, SUM("+columns+") AS TOTAL FROM volume_usage"
+sql_query(query_string +" GROUP BY filer")
+
+#print query_string + " GROUP BY filer"
+
+query_string = "SELECT filer, path, access_or_modify,\
+	SUM(005_day_data+010_day_data+015_day_data+020_day_data+025_day_data+030_day_data+035_day_data+040_day_data+045_day_data+050_day_data+055_day_data+060_day_data+065_day_data+070_day_data+075_day_data+080_day_data+085_day_data+090_day_data+095_day_data+100_day_data+105_day_data+110_day_data+115_day_data+120_day_data+125_day_data+130_day_data+135_day_data+140_day_data+145_day_data+150_day_data+155_day_data+160_day_data+165_day_data+170_day_data+175_day_data+180_day_data) \
+	AS TOTAL FROM volume_usage WHERE access_or_modify = 'MODIFIED' GROUP BY filer, path, access_or_modify HAVING TOTAL > 0 AND TOTAL < 10000001"
+
+sql_query(query_string)
+
+#columns = build_only_days_data_columns_string()
+#print columns
+
+
+print "exit"
+exit (0)
